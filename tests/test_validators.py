@@ -54,6 +54,12 @@ def test_wrong_python_type_is_rejected() -> None:
         parse_product_input(12)  # type: ignore[arg-type]
 
 
+def test_missing_product_name_has_a_field_message() -> None:
+    with pytest.raises(InvalidProductInputError) as caught:
+        parse_product_input({"manufacturer": "Manotom", "specs": {}})
+    assert any("name" in error and "required" in error for error in caught.value.errors)
+
+
 def test_missing_manufacturer_has_a_field_message() -> None:
     with pytest.raises(InvalidProductInputError) as caught:
         parse_product_input({"name": "DM 02", "specs": {}})
@@ -222,6 +228,17 @@ def test_schema_mismatch_is_an_output_validation_error() -> None:
     product = parse_product_input(load_example("pressure_gauge.json"))
     with pytest.raises(OutputValidationError, match="seo_title"):
         validate_generated_output({"name": product.name}, product)
+
+
+def test_wrong_search_query_count_is_rejected() -> None:
+    product = parse_product_input(load_example("pressure_gauge.json"))
+    payload = build_card(product)
+    payload["search_queries"] = ["one", "two"]
+    with pytest.raises(OutputValidationError, match="3 to 5"):
+        validate_generated_output(payload, product)
+    payload["search_queries"] = ["one", "two", "three", "four", "five", "six"]
+    with pytest.raises(OutputValidationError, match="3 to 5"):
+        validate_generated_output(payload, product)
 
 
 def test_seo_title_length_is_rejected() -> None:

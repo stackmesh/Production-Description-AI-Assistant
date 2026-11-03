@@ -13,9 +13,10 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from src.config import load_settings
+from src.exceptions import InvalidLLMResponseError, OutputValidationError
 from src.llm_client import LLMClient
 from src.prompts import build_messages, build_revision_messages
-from src.schemas import ProductCardOutput, ProductInput
+from src.schemas import ProductCardOutput, ProductDescription, ProductInput
 from src.validators import (
     apply_seo_length_warnings,
     assess_generated_output,
@@ -80,20 +81,30 @@ class ProductDescriptionGenerator:
             self._client.model,
         )
         revised = False
+        revision_rejected = False
         sender = _revision_sender(self._client)
         if sender is not None:
             draft = _json_object(raw)
-            revised_raw = sender(
-                build_revision_messages(product, draft, assessment.length_violations)
-            )
-            revised = True
-            assessment = assess_generated_output(revised_raw, product)
+            try:
+                revised_raw = sender(
+                    build_revision_messages(product, draft, assessment.length_violations)
+                )
+                assessment = assess_generated_output(revised_raw, product)
+                revised = True
+            except (OutputValidationError, InvalidLLMResponseError):
+                logger.warning(
+                    "Discarded the SEO length revision because it failed validation"
+                )
+                revision_rejected = True
         if assessment.length_violations:
-            return apply_seo_length_warnings(
+            card = apply_seo_length_warnings(
                 assessment.card,
                 assessment.length_violations,
                 revised=revised,
             )
+            if revision_rejected:
+                card = _note_discarded_revision(card)
+            return card
         return assessment.card
 
 
@@ -120,6 +131,19 @@ def generate_product_description(
     if client is None:
         client = LLMClient(load_settings())
     return ProductDescriptionGenerator(client).generate(product)
+
+
+_DISCARDED_REVISION = (
+    "The length revision was discarded because it did not pass validation. "
+    "The earlier draft was kept so that no unsupported facts would be published."
+)
+
+
+def _note_discarded_revision(card: ProductDescription) -> ProductDescription:
+    warnings = list(card.warnings)
+    if _DISCARDED_REVISION not in warnings:
+        warnings.append(_DISCARDED_REVISION)
+    return card.model_copy(update={"warnings": warnings})
 
 
 def _revision_sender(

@@ -121,6 +121,20 @@ def test_rate_limit_is_raised_once_and_the_key_is_redacted(caplog: pytest.LogCap
     assert "sk-test-key" not in caplog.text
 
 
+def test_authentication_failure_does_not_reveal_the_key() -> None:
+    class AuthenticationError(Exception):
+        status_code = 401
+
+        def __str__(self) -> str:
+            return "invalid key sk-test-key"
+
+    client = LLMClient(_settings(), sdk=_SDK(AuthenticationError()))
+    with pytest.raises(APICommunicationError, match="OPENAI_API_KEY") as caught:
+        client.complete([{"role": "user", "content": "Create the card."}])
+    assert caught.value.status_code == 401
+    assert "sk-test-key" not in str(caught.value)
+
+
 def test_connection_error_is_an_api_communication_error() -> None:
     class APITimeoutError(Exception):
         pass

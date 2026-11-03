@@ -141,6 +141,21 @@ def test_seo_description_outside_the_range_is_preserved_with_a_warning() -> None
     assert any("800" in warning and "kept after one revision" in warning for warning in card.warnings)
 
 
+def test_rejected_revision_keeps_the_factual_draft() -> None:
+    product = ProductInput.model_validate(load_example("pressure_gauge.json"))
+    short = build_card(product)
+    short["seo_description"] = "A" * 500
+    invented = build_card(product)
+    invented["sales_pitch"] = "Mention the 0–2.5 MPa range to buyers."
+    client = _SequencedClient([short, invented])
+    card = ProductDescriptionGenerator(client).generate(product)
+    assert client.calls == ["generate", "revise"]
+    assert card.seo_description == "A" * 500
+    assert "0–2.5" not in card.sales_pitch
+    assert any("discarded" in warning for warning in card.warnings)
+    assert any("500" in warning for warning in card.warnings)
+
+
 def test_invented_values_are_not_sent_for_a_length_revision() -> None:
     product = ProductInput.model_validate(load_example("pressure_gauge.json"))
     payload = build_card(product)

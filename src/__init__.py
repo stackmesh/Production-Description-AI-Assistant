@@ -2,7 +2,7 @@
 
 This package drafts product cards from supplied facts: configuration, input
 and output schemas, prompts, the OpenAI call, and validation. The Streamlit
-interface is a later milestone.
+page in ``app.py`` is the content-manager interface.
 """
 
 from __future__ import annotations
