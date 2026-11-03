@@ -1,0 +1,11 @@
+{
+  "name": "DM 02 Pressure Gauge",
+  "manufacturer": "Manotom",
+  "specs": {
+    "measurement_range": "0–1.6 MPa",
+    "accuracy_class": "1.5",
+    "connection": "G1/2",
+    "housing_diameter": "100 mm"
+  },
+  "description": "The device is designed to measure gauge pressure."
+}
