@@ -2,12 +2,12 @@
 
 Lightweight foundation for drafting B2B product cards for industrial measuring instruments. The application will turn structured product facts into an SEO title, an SEO description, key features, search queries, and a short sales pitch for the content manager.
 
-This milestone builds the project foundation: configuration, schemas, prompts, validation, and the module boundaries. The Streamlit interface and the OpenAI request come next.
+Content managers use the Streamlit page to paste product JSON or fill in a form. The page calls the generation service and keeps each product card separate.
 
 ## Architecture
 
 ```text
-app.py                         Streamlit entry point (later milestone)
+app.py                         Streamlit page: input, results, export
         |
         v
 src/generator.py               validate input -> request a card -> validate output
@@ -20,9 +20,9 @@ src/schemas.py                    src/config.py
 src/prompts.py                    src/exceptions.py
 ```
 
-`generator.py` is the only orchestration point. It validates the payload, asks `LLMClient` for a card, and checks that card against the original product. `LLMClient.generate_product_card` is intentionally unimplemented, so nothing in this milestone sends product data to OpenAI.
+`app.py` only presents the product and the card. `generator.py` validates the payload, asks `LLMClient` for a card, and checks that card against the original product.
 
-`schemas.py` owns the Pydantic contracts. `validators.py` owns JSON parsing and the rule that technical specifications are copied from the source. `prompts.py` owns the instructions the later API call will send. `config.py` loads `OPENAI_API_KEY` and `OPENAI_MODEL` from the environment.
+`schemas.py` owns the Pydantic contracts. `validators.py` owns JSON parsing and the rule that technical specifications are copied from the source. `prompts.py` owns the instructions sent to the model. `config.py` loads `OPENAI_API_KEY` and `OPENAI_MODEL` from the environment.
 
 ## Input
 
@@ -90,7 +90,7 @@ cp .env.example .env
 | `InvalidLLMResponseError` | Empty response, refusal, or non-JSON model output |
 | `OutputValidationError` | JSON that breaks the card contract or invents specifications |
 
-`translate_api_error()` maps an SDK exception onto `RateLimitError` or `APICommunicationError`. The generator will use it when the API call is added.
+`translate_api_error()` maps an SDK exception onto `RateLimitError` or `APICommunicationError`. The Streamlit page shows those messages and does not display API keys or tracebacks.
 
 ## Project layout
 
@@ -125,17 +125,15 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pytest
-python app.py
+streamlit run app.py
 ```
 
-`python app.py` prints the milestone status. It does not start Streamlit yet.
+Open `http://localhost:8501`. Copy `.env.example` to `.env` and set `OPENAI_API_KEY` and `OPENAI_MODEL` before generating a card. `python app.py` only prints the Streamlit command.
 
 ## Tests
 
 The suite covers configuration, both schemas, JSON and type errors, empty specifications, invented measurements, prompt content, the generation boundary, dependency imports, `requirements.txt`, `.env.example`, and `.gitignore`.
 
-## Next milestones
+## Interface
 
-1. Implement `LLMClient.generate_product_card` with the OpenAI Responses API, `build_messages()`, and `openai_structured_schema()`.
-2. Map SDK failures through `translate_api_error()`.
-3. Add the Streamlit form in `app.py` that accepts the product JSON and shows the validated card.
+`streamlit run app.py` opens the content-manager page. JSON and the manual form both use `ProductInput`. Generate calls `generate_product_description()`. Each card stays in the session until it is removed. JSON and Markdown downloads use the output schema and a catalog-style document.
